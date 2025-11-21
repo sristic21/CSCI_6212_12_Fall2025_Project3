@@ -39,7 +39,7 @@ cd DesignAndAnalysis_Algorithms
 2. Run the Python script:
 
 ```bash
-python project3.py
+python project_3.py
 ```
 3. The script performs the following tasks:
 
