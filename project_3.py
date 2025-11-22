@@ -7,45 +7,27 @@ import sys
 import gc
 import unittest
 
-# Increase recursion limit for large graphs
-sys.setrecursionlimit(50000)
-
-# ============================================================================
-# MAIN IMPLEMENTATION
-# ============================================================================
+sys.setrecursionlimit(50000)  # Need this for large graphs to avoid stack overflow
 
 class Graph:
-    """Graph representation using adjacency list"""
     def __init__(self, n):
         self.n = n
-        self.adj = defaultdict(list)
+        self.adj = defaultdict(list)  # Using defaultdict so we don't get KeyError
 
     def add_edge(self, u, v):
-        """Add undirected edge between u and v"""
-        self.adj[u].append(v)
+        self.adj[u].append(v)  # Undirected, so add both ways
         self.adj[v].append(u)
 
     def get_adjacency_list(self):
-        """Return adjacency list representation"""
         return [self.adj[i] for i in range(self.n)]
 
 
 def find_articulation_points(graph, n):
-    """
-    Find all articulation points in O(n + m) time using DFS.
-
-    Args:
-        graph: Adjacency list representation
-        n: Number of vertices
-
-    Returns:
-        Set of articulation points
-    """
-    discovery = [-1] * n  # Discovery time
-    low = [-1] * n  # Lowest discovery time reachable
-    parent = [-1] * n  # Parent in DFS tree
+    discovery = [-1] * n  # When we first visit each vertex
+    low = [-1] * n        # Earliest vertex reachable from subtree
+    parent = [-1] * n     # To track DFS tree structure
     articulation_points = set()
-    time_counter = [0]
+    time_counter = [0]    # Using list so it's mutable in nested function
 
     def dfs(u):
         children = 0
@@ -53,26 +35,23 @@ def find_articulation_points(graph, n):
         time_counter[0] += 1
 
         for v in graph[u]:
-            if discovery[v] == -1:  # Unvisited
+            if discovery[v] == -1:
                 children += 1
                 parent[v] = u
                 dfs(v)
 
-                low[u] = min(low[u], low[v])
+                low[u] = min(low[u], low[v])  # Update with child's low value
 
-                # Root with multiple children
-                if parent[u] == -1 and children > 1:
+                if parent[u] == -1 and children > 1:  # Root with 2+ children is AP
                     articulation_points.add(u)
 
-                # Non-root: child cannot reach ancestor
-                if parent[u] != -1 and low[v] >= discovery[u]:
+                if parent[u] != -1 and low[v] >= discovery[u]:  # Non-root AP condition
                     articulation_points.add(u)
 
-            elif v != parent[u]:  # Back edge
+            elif v != parent[u]:  # Back edge (not going back to parent)
                 low[u] = min(low[u], discovery[v])
 
-    # Run DFS from all unvisited vertices
-    for i in range(n):
+    for i in range(n):  # Start DFS from each unvisited vertex
         if discovery[i] == -1:
             dfs(i)
 
@@ -80,40 +59,38 @@ def find_articulation_points(graph, n):
 
 
 def is_biconnected(graph, n):
-    """Check if graph is biconnected (no articulation points)"""
     if n < 2:
         return True
     articulation_points = find_articulation_points(graph, n)
-    return len(articulation_points) == 0
+    return len(articulation_points) == 0  # Biconnected = no articulation points
 
 
 def generate_random_connected_graph(n, m):
-    """Generate a random connected graph with n vertices and m edges"""
     if m < n - 1:
-        m = n - 1
+        m = n - 1  # Need at least n-1 edges to be connected
     if m > n * (n - 1) // 2:
-        m = n * (n - 1) // 2
+        m = n * (n - 1) // 2  # Can't have more than this many edges
 
     g = Graph(n)
     edges = set()
 
-    # Create spanning tree for connectivity
+    # First create a spanning tree to guarantee connectivity
     vertices = list(range(n))
     random.shuffle(vertices)
     for i in range(1, n):
         u = vertices[i]
-        v = vertices[random.randint(0, i-1)]
+        v = vertices[random.randint(0, i-1)]  # Connect to someone already in tree
         edge = tuple(sorted([u, v]))
         edges.add(edge)
         g.add_edge(u, v)
 
-    # Add remaining edges
+    # Then add remaining edges randomly
     while len(edges) < m:
         u = random.randint(0, n-1)
         v = random.randint(0, n-1)
         if u != v:
             edge = tuple(sorted([u, v]))
-            if edge not in edges:
+            if edge not in edges:  # Don't add duplicate edges
                 edges.add(edge)
                 g.add_edge(u, v)
 
@@ -121,40 +98,33 @@ def generate_random_connected_graph(n, m):
 
 
 def measure_runtime(n, m, num_trials=30):
-    """Measure average runtime for finding articulation points"""
-    # Generate graph once
     g, actual_m = generate_random_connected_graph(n, m)
     adj_list = g.get_adjacency_list()
 
     times = []
 
-    # Warm-up runs
-    for _ in range(10):
+    for _ in range(10):  # Warm-up runs to stabilize measurements
         find_articulation_points(adj_list, n)
 
-    # Garbage collection
-    gc.collect()
+    gc.collect()  # Clean up before measuring
     time.sleep(0.01)
 
-    # Measure multiple times
     for _ in range(num_trials):
         start = time.perf_counter()
         find_articulation_points(adj_list, n)
         end = time.perf_counter()
 
-        times.append((end - start) * 1e9)
+        times.append((end - start) * 1e9)  # Convert to nanoseconds
 
-    # Remove outliers
     times.sort()
     if len(times) > 12:
-        times = times[5:-5]
+        times = times[5:-5]  # Remove outliers (top 5 and bottom 5)
 
     return np.mean(times), actual_m
 
 
 def run_experiments():
-    """Run experiments for various graph sizes"""
-    test_sizes = [100, 200, 500, 1000, 2000, 3000, 5000, 7000, 10000]
+    test_sizes = [100, 1000, 2000, 4000, 8000, 16000]      # Values of n
 
     results = []
 
@@ -162,11 +132,11 @@ def run_experiments():
     print("=" * 80)
 
     for n in test_sizes:
-        m = 2 * n
+        m = 2 * n  # For a sparse graph where 2 edges per vertex
         print(f"Testing n={n:5d}, target m={m:5d}...", end=" ", flush=True)
 
         avg_time, actual_m = measure_runtime(n, m, num_trials=30)
-        theoretical_ops = n + actual_m
+        theoretical_ops = n + actual_m  # Total operations = process n vertices + m edges
 
         results.append({
             'n': n,
@@ -180,20 +150,16 @@ def run_experiments():
     return results
 
 
-def calculate_scaling_constants(results):
-    """Calculate scaling constants using linear regression"""
-    X = np.array([r['theoretical_ops'] for r in results])
-    y = np.array([r['experimental_time'] for r in results])
+def calculate_scaling_constants(results):       # Using linear regression
+    x = np.array([r['theoretical_ops'] for r in results])  # Theoretical operations
+    y = np.array([r['experimental_time'] for r in results])  # Measured time
 
-    A = np.vstack([np.ones(len(X)), X]).T
-    coeffs = np.linalg.lstsq(A, y, rcond=None)[0]
+    C1, C0 = np.polyfit(x, y, 1)  # polyfit returns [slope, intercept]
 
-    C0, C1 = coeffs
     return C0, C1
 
 
 def create_output_table(results, C0, C1):
-    """Create and display the output table"""
     print("\n" + "=" * 110)
     print("EXPERIMENTAL RESULTS")
     print("=" * 110)
@@ -207,15 +173,15 @@ def create_output_table(results, C0, C1):
 
     for r in results:
         theo_ops = r['theoretical_ops']
-        scaled_theory = C0 + C1 * theo_ops
-        exp_time = r['experimental_time']
+        scaled_theory = C0 + C1 * theo_ops  # Predicted theoretical values
+        exp_time = r['experimental_time']  # Experimental values
         ratio = exp_time / scaled_theory
 
         print(f"{r['n']:<8} {r['m']:<8} {theo_ops:<15} {scaled_theory:<18.2f} {exp_time:<18.2f} {ratio:<8.4f}")
 
     print("=" * 110)
 
-    # Calculate goodness of fit
+    # Calculate R² to see how good our fit is
     predicted = [C0 + C1 * r['theoretical_ops'] for r in results]
     actual = [r['experimental_time'] for r in results]
     residuals = [a - p for a, p in zip(actual, predicted)]
@@ -229,20 +195,19 @@ def create_output_table(results, C0, C1):
 
 
 def plot_results(results, C0, C1):
-    """Create the comparison plot"""
     n_values = [r['n'] for r in results]
     theoretical_ops = [r['theoretical_ops'] for r in results]
     experimental_times = [r['experimental_time'] for r in results]
 
     scaled_theoretical = [C0 + C1 * ops for ops in theoretical_ops]
 
-    plt.figure(figsize=(14, 8))
+    plt.figure(figsize=(9, 7))
 
-    # Plot experimental data
+    # Plot actual measurements
     plt.plot(n_values, experimental_times, 'bo-', label='Experimental Runtime',
              linewidth=2.5, markersize=10, markeredgewidth=2, markeredgecolor='darkblue')
 
-    # Plot scaled theoretical
+    # Plot what theory predicts
     plt.plot(n_values, scaled_theoretical, 'r--', label='Scaled Theoretical Runtime',
              linewidth=2.5, markersize=8, marker='s', markeredgewidth=2, markeredgecolor='darkred')
 
@@ -255,7 +220,6 @@ def plot_results(results, C0, C1):
     plt.legend(fontsize=12, loc='upper left', framealpha=0.9)
     plt.grid(True, alpha=0.3, linestyle='--', linewidth=1)
 
-    # Add text box
     textstr = f'Time Complexity: O(n + m)\nFor sparse graphs: O(n)\nLinear growth confirmed\nConstant overhead: {C0:,.0f} ns'
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.7)
     plt.text(0.58, 0.20, textstr, transform=plt.gca().transAxes, fontsize=11,
@@ -266,26 +230,21 @@ def plot_results(results, C0, C1):
     ax.tick_params(labelsize=11)
 
     plt.tight_layout()
-
+    plt.savefig('articulation_points_analysis.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+    print("\nGraph saved as 'articulation_points_analysis.png'")
 
 
 
-# ============================================================================
 # UNIT TESTS
-# ============================================================================
-
 class TestGraph(unittest.TestCase):
-    """Test cases for Graph class"""
 
     def test_graph_initialization(self):
-        """Test graph initialization"""
         g = Graph(5)
         self.assertEqual(g.n, 5)
 
     def test_add_edge(self):
-        """Test edge addition"""
         g = Graph(3)
         g.add_edge(0, 1)
         g.add_edge(1, 2)
@@ -296,7 +255,6 @@ class TestGraph(unittest.TestCase):
         self.assertIn(1, g.adj[2])
 
     def test_get_adjacency_list(self):
-        """Test adjacency list retrieval"""
         g = Graph(3)
         g.add_edge(0, 1)
         g.add_edge(1, 2)
@@ -306,10 +264,8 @@ class TestGraph(unittest.TestCase):
 
 
 class TestArticulationPoints(unittest.TestCase):
-    """Test cases for articulation point detection"""
 
     def test_simple_chain(self):
-        """Test chain: 0-1-2-3"""
         g = Graph(4)
         g.add_edge(0, 1)
         g.add_edge(1, 2)
@@ -321,7 +277,6 @@ class TestArticulationPoints(unittest.TestCase):
         self.assertEqual(ap, {1, 2})
 
     def test_triangle(self):
-        """Test triangle has no articulation points"""
         g = Graph(3)
         g.add_edge(0, 1)
         g.add_edge(1, 2)
@@ -333,7 +288,6 @@ class TestArticulationPoints(unittest.TestCase):
         self.assertEqual(len(ap), 0)
 
     def test_star_graph(self):
-        """Test star graph - center is articulation point"""
         g = Graph(5)
         for i in range(1, 5):
             g.add_edge(0, i)
@@ -344,7 +298,6 @@ class TestArticulationPoints(unittest.TestCase):
         self.assertEqual(ap, {0})
 
     def test_two_triangles_connected(self):
-        """Test two triangles with bridge"""
         g = Graph(6)
         g.add_edge(0, 1)
         g.add_edge(1, 2)
@@ -354,7 +307,7 @@ class TestArticulationPoints(unittest.TestCase):
         g.add_edge(4, 5)
         g.add_edge(5, 3)
 
-        g.add_edge(2, 3)  # Bridge
+        g.add_edge(2, 3)
 
         adj_list = g.get_adjacency_list()
         ap = find_articulation_points(adj_list, 6)
@@ -362,7 +315,6 @@ class TestArticulationPoints(unittest.TestCase):
         self.assertEqual(ap, {2, 3})
 
     def test_complete_graph(self):
-        """Test complete graph has no articulation points"""
         g = Graph(4)
         for i in range(4):
             for j in range(i + 1, 4):
@@ -375,10 +327,8 @@ class TestArticulationPoints(unittest.TestCase):
 
 
 class TestBiconnectivity(unittest.TestCase):
-    """Test cases for biconnectivity checking"""
 
     def test_biconnected_triangle(self):
-        """Test triangle is biconnected"""
         g = Graph(3)
         g.add_edge(0, 1)
         g.add_edge(1, 2)
@@ -388,7 +338,6 @@ class TestBiconnectivity(unittest.TestCase):
         self.assertTrue(is_biconnected(adj_list, 3))
 
     def test_not_biconnected_chain(self):
-        """Test chain is not biconnected"""
         g = Graph(4)
         g.add_edge(0, 1)
         g.add_edge(1, 2)
@@ -398,7 +347,6 @@ class TestBiconnectivity(unittest.TestCase):
         self.assertFalse(is_biconnected(adj_list, 4))
 
     def test_biconnected_complete_graph(self):
-        """Test complete graph is biconnected"""
         g = Graph(4)
         for i in range(4):
             for j in range(i + 1, 4):
@@ -408,7 +356,6 @@ class TestBiconnectivity(unittest.TestCase):
         self.assertTrue(is_biconnected(adj_list, 4))
 
     def test_biconnected_cycle(self):
-        """Test cycle is biconnected"""
         g = Graph(5)
         for i in range(5):
             g.add_edge(i, (i + 1) % 5)
@@ -418,15 +365,12 @@ class TestBiconnectivity(unittest.TestCase):
 
 
 class TestRandomGraphGeneration(unittest.TestCase):
-    """Test cases for random graph generation"""
 
     def test_generates_correct_vertex_count(self):
-        """Test vertex count"""
         g, m = generate_random_connected_graph(10, 20)
         self.assertEqual(g.n, 10)
 
     def test_generates_correct_edge_count(self):
-        """Test edge count"""
         n, target_m = 10, 20
         g, actual_m = generate_random_connected_graph(n, target_m)
 
@@ -435,12 +379,10 @@ class TestRandomGraphGeneration(unittest.TestCase):
         self.assertEqual(actual_m, target_m)
 
     def test_minimum_edges_for_connectivity(self):
-        """Test minimum edges enforced"""
         g, m = generate_random_connected_graph(10, 5)
         self.assertGreaterEqual(m, 9)
 
     def test_graph_is_connected(self):
-        """Test generated graph is connected"""
         g, m = generate_random_connected_graph(10, 15)
         adj_list = g.get_adjacency_list()
 
@@ -456,12 +398,9 @@ class TestRandomGraphGeneration(unittest.TestCase):
         self.assertTrue(all(visited))
 
 
-# ============================================================================
-# MAIN EXECUTION
-# ============================================================================
 
+# MAIN EXECUTION
 def run_unit_tests():
-    """Run all unit tests"""
     print("\nRunning unit tests...", end=" ", flush=True)
 
     loader = unittest.TestLoader()
@@ -472,15 +411,13 @@ def run_unit_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestBiconnectivity))
     suite.addTests(loader.loadTestsFromTestCase(TestRandomGraphGeneration))
 
-    # Run tests silently
     runner = unittest.TextTestRunner(stream=open('/dev/null', 'w'), verbosity=0)
     result = runner.run(suite)
 
     if result.wasSuccessful():
         print(f"All {result.testsRun} tests passed!")
     else:
-        print(f" {len(result.failures) + len(result.errors)} tests failed")
-        # Show failures if any
+        print(f"{len(result.failures) + len(result.errors)} tests failed")
         for test, traceback in result.failures + result.errors:
             print(f"\nFailed: {test}")
             print(traceback)
@@ -489,29 +426,27 @@ def run_unit_tests():
 
 
 def main():
-    """Main execution function"""
     print("\n" + "=" * 80)
     print("BICONNECTIVITY AND ARTICULATION POINTS ANALYSIS")
     print("=" * 80)
 
-    # Run unit tests
     tests_passed = run_unit_tests()
 
     if not tests_passed:
-        print("\n Tests failed. Please review.\n")
+        print("\n  Tests failed. Please review.\n")
         return
 
-    # Run experiments
     results = run_experiments()
 
-    # Calculate scaling constants
     C0, C1 = calculate_scaling_constants(results)
 
-    # Display results
     create_output_table(results, C0, C1)
 
-    # Generate plot
     plot_results(results, C0, C1)
+
+    print("\n" + "=" * 80)
+    print("ANALYSIS COMPLETE")
+    print("=" * 80 + "\n")
 
 
 if __name__ == "__main__":
