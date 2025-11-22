@@ -14,7 +14,7 @@ Given a graph G, check if the graph is biconnected or not. If it is not, identif
 The following `n` values have been used in the experiment:
 
 ```python
-n_values = [100, 200, 500, 1000, 2000, 3000, 5000, 7000, 10000]
+n_values = [100, 1000, 2000, 4000, 8000, 16000]
 
 ```
 ## Prerequisites
