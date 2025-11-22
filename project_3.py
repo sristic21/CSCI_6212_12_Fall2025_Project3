@@ -1,3 +1,5 @@
+# Group 9 - Deepti Lakshmi Ravi, Sristi Chakraborty, Sinchana Manjula Prabhakara, Harishitha Chowdary Alapati
+
 import time
 import random
 import matplotlib.pyplot as plt
